@@ -20,9 +20,10 @@ MNN::OpParameter UpsampleOnnx::type() {
 void UpsampleOnnx::run(MNN::OpT* dstOp, const onnx::NodeProto* onnxNode,
                        std::vector<const onnx::TensorProto*> initializers) {
     auto interpParam = new MNN::InterpT;
-
+    printf("UpsampleOnnx\n");
     std::string mode;
     std::vector<float> scales;
+    int flag_h_w = 0;
     for (int i = 0; i < onnxNode->attribute_size(); ++i) {
         const auto& attributeProto = onnxNode->attribute(i);
         const auto& attributeName  = attributeProto.name();
@@ -34,6 +35,11 @@ void UpsampleOnnx::run(MNN::OpT* dstOp, const onnx::NodeProto* onnxNode,
                 scales[j] = attributeProto.floats(j);
             }
         }
+ 	else if ((onnxNode->input_size() == 1) && ((attributeName == "height_scale")||(attributeName == "width_scale"))) {
+                scales.push_back(attributeProto.f());
+                flag_h_w++;
+        }
+       
     }
 
     if (onnxNode->input_size() != 1) {
@@ -52,13 +58,20 @@ void UpsampleOnnx::run(MNN::OpT* dstOp, const onnx::NodeProto* onnxNode,
             scales.push_back(raw_data[j]);
         }
     }
-
+    
     // TODO defalut
     interpParam->widthScale  = 1.0f;
     interpParam->heightScale = 1.0f;
-    if (scales.size() == 2) {
-        interpParam->widthScale = scales[1];
-    } else if (scales.size() == 3) {
+    if (scales.size() == 2 ) {
+        if(flag_h_w != 2){
+        	interpParam->widthScale = scales[1];
+	}
+        else{
+		interpParam->heightScale = scales[0];
+                interpParam->widthScale = scales[1];
+	}
+    } 
+    else if (scales.size() == 3) {
         interpParam->widthScale  = scales[2];
         interpParam->heightScale = scales[1];
     } else if (scales.size() == 4) {
@@ -69,6 +82,7 @@ void UpsampleOnnx::run(MNN::OpT* dstOp, const onnx::NodeProto* onnxNode,
             DLOG(ERROR) << "Unsupported Upsample scales! ==> " << scales[1];
         }
     } else {
+        DLOG(ERROR) << "*****************! ==> " << scales.size();
         DLOG(ERROR) << "Unsupported Upsample scales size! ==> " << scales.size();
     }
 
@@ -84,4 +98,4 @@ void UpsampleOnnx::run(MNN::OpT* dstOp, const onnx::NodeProto* onnxNode,
     dstOp->main.value = interpParam;
 }
 
-// REGISTER_CONVERTER(UpsampleOnnx, Upsample);
+ REGISTER_CONVERTER(UpsampleOnnx, Upsample);
